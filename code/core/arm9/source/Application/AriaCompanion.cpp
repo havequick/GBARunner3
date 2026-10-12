@@ -28,15 +28,16 @@ constexpr int kTW = 32, kTH = 20;
 constexpr int kTopTile = 2;
 constexpr uintptr_t kChars = 0x06200000;
 constexpr uintptr_t kMapVram = 0x06208000;
+constexpr uintptr_t kSignatures = kMapVram + 32 * 32 * sizeof(u16);
 constexpr uintptr_t kPal = 0x05000400;
 
 bool sActive = false;
 u32 sFrame = 0;
-u16 sSig[kTW * kTH];
 
 constexpr u16 rgb15(int r, int g, int b) { return (u16)(r | (g << 5) | (b << 10)); }
 inline volatile u8* tilePtr(int n) { return (volatile u8*)(kChars + n * 32); }
 inline volatile u16* tileMap() { return (volatile u16*)kMapVram; }
+inline volatile u16* signatures() { return (volatile u16*)kSignatures; }
 
 inline void px(volatile u8* t, int x, int y, u8 c)
 {
@@ -115,9 +116,9 @@ void redraw()
         {
             const int i = ty * kTW + tx;
             const u16 v = signature(tx, ty, x, y, showPlayer);
-            if (sSig[i] != v)
+            if (signatures()[i] != v)
             {
-                sSig[i] = v;
+                signatures()[i] = v;
                 drawTile(tx, ty, x, y, showPlayer);
             }
         }
@@ -125,8 +126,10 @@ void redraw()
 
 void initSubScreen()
 {
-    mem_setVramHMapping(MEM_VRAM_H_SUB_BG_00000);
-    mem_setVramIMapping(MEM_VRAM_I_SUB_BG_08000);
+    // H and I hold the relocated GBA BIOS and the ROM cache lookup table.
+    // VRAM C is otherwise only needed by the center-and-mask capture path,
+    // which is deliberately disabled while the companion is active.
+    mem_setVramCMapping(MEM_VRAM_C_SUB_BG_00000);
 
     volatile u16* pal = (volatile u16*)kPal;
     pal[0] = rgb15(0, 0, 0);
@@ -156,16 +159,17 @@ void ariaCompanionInitialize(const DisplaySettings& displaySettings)
     sActive = false;
     if (gRomHeader.gameCode != kAriaUs) return;
     if (displaySettings.gbaScreen != GbaScreen::Top || displaySettings.enableCenterAndMask) return;
-    for (u16& v : sSig) v = 0xFFFF;
     sFrame = 0;
     initSubScreen();
+    for (int i = 0; i < kTW * kTH; ++i) signatures()[i] = 0xFFFF;
     sActive = true;
     redraw();
 }
 
-extern "C" void aria_companion_vblank()
+extern "C" int aria_companion_vblank()
 {
-    if (!sActive) return;
+    if (!sActive) return 0;
     ++sFrame;
     if ((sFrame & 3) == 0) redraw();
+    return 1;
 }
