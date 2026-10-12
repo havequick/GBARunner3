@@ -6,6 +6,8 @@
 #include "SystemIpc.h"
 #include "AriaCompanion.h"
 
+extern GbaHeader gRomHeader;
+
 // Castlevania: Aria of Sorrow (USA) second-screen live map prototype.
 // Target ROM: A2CE / SHA-1 abd71fe01ebb201bcc133074db1dd8c5253776c7
 namespace
@@ -149,10 +151,10 @@ void initSubScreen()
 }
 }
 
-void ariaCompanionInitialize(u32 gameCode, const DisplaySettings& displaySettings)
+void ariaCompanionInitialize(const DisplaySettings& displaySettings)
 {
     sActive = false;
-    if (gameCode != kAriaUs) return;
+    if (gRomHeader.gameCode != kAriaUs) return;
     if (displaySettings.gbaScreen != GbaScreen::Top || displaySettings.enableCenterAndMask) return;
     for (u16& v : sSig) v = 0xFFFF;
     sFrame = 0;
