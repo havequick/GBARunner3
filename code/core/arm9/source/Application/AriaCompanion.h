@@ -2,4 +2,4 @@
 #include "Application/Settings/DisplaySettings.h"
 
 void ariaCompanionInitialize(const DisplaySettings& displaySettings);
-extern "C" void aria_companion_vblank();
+extern "C" int aria_companion_vblank();
