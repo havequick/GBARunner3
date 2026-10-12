@@ -2,11 +2,19 @@
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxBackground.h>
+#include <libtwl/gfx/gfxStatus.h>
 #include "GbaHeader.h"
 #include "SystemIpc.h"
+#include "VirtualMachine/VMDtcm.h"
 #include "AriaCompanion.h"
 
 extern GbaHeader gRomHeader;
+
+extern "C"
+{
+volatile u32 aria_companion_hblank_mask_active = 0;
+volatile u16 aria_companion_saved_master_bright = 0;
+}
 
 // Castlevania: Aria of Sorrow (USA) second-screen live map prototype.
 // Target ROM: A2CE / SHA-1 abd71fe01ebb201bcc133074db1dd8c5253776c7
@@ -124,6 +132,14 @@ void redraw()
         }
 }
 
+void keepTopScreenMaskIrqEnabled()
+{
+    // We use HBlank only to black the DS-only scanlines 160-191. This keeps
+    // direct GBA rendering (and its latency) intact instead of frame-capturing.
+    vm_forcedIrqMask |= 1 << 1;
+    gfx_setHBlankIrqEnabled(true);
+}
+
 void initSubScreen()
 {
     // H and I hold the relocated GBA BIOS and the ROM cache lookup table.
@@ -157,8 +173,16 @@ void initSubScreen()
 void ariaCompanionInitialize(const DisplaySettings& displaySettings)
 {
     sActive = false;
+    aria_companion_hblank_mask_active = 0;
     if (gRomHeader.gameCode != kAriaUs) return;
     if (displaySettings.gbaScreen != GbaScreen::Top || displaySettings.enableCenterAndMask) return;
+
+    // Save the user's configured top-screen brightness so HBlank can restore it
+    // before scanline 0 of the next frame.
+    aria_companion_saved_master_bright = REG_MASTER_BRIGHT;
+    keepTopScreenMaskIrqEnabled();
+    aria_companion_hblank_mask_active = 1;
+
     sFrame = 0;
     initSubScreen();
     for (int i = 0; i < kTW * kTH; ++i) signatures()[i] = 0xFFFF;
@@ -169,6 +193,11 @@ void ariaCompanionInitialize(const DisplaySettings& displaySettings)
 extern "C" int aria_companion_vblank()
 {
     if (!sActive) return 0;
+
+    // Some GBA DMA transitions can alter the emulator's forced HBlank state.
+    // Reassert once per frame; the DMA stop path also preserves it for us.
+    keepTopScreenMaskIrqEnabled();
+
     ++sFrame;
     if ((sFrame & 3) == 0) redraw();
     return 1;
