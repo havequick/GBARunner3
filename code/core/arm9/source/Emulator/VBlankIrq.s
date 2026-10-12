@@ -30,6 +30,15 @@ updateDisplayCaptureVramD:
 checkSaveWrite:
     str r13, jumpToCaptureUpdate
 
+#ifndef GBAR3_TEST
+    // Lightweight game-specific companion update. The function is a no-op
+    // unless the verified Aria USA ROM is running with the GBA on top.
+    ldr sp,= dtcmIrqStackEnd
+    push {r0-r3,r12}
+    bl aria_companion_vblank
+    pop {r0-r3,r12}
+#endif
+
     // This is replaced by a nop when no vblank dma is in use
 .global emu_vblankDmaJumpInstruction
 emu_vblankDmaJumpInstruction:
