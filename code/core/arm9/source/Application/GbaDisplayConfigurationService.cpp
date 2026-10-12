@@ -9,6 +9,7 @@
 #include "GbaColorCorrection/ColorLut.h"
 #include "SystemIpc.h"
 #include "GbaDisplayConfigurationService.h"
+#include "AriaCompanion.h"
 
 GbaDisplayConfigurationService gGbaDisplayConfigurationService;
 
@@ -28,25 +29,21 @@ void GbaDisplayConfigurationService::SetupCaptureOam(const DisplaySettings& disp
         }
     }
 
-    // attempt to not overlap the masked part as much as possible
-    int lastColumnX = ((NDS_LCD_WIDTH - (2 * displaySettings.centerOffsetX) - 64) + 7) & ~7;
-    int lastRowY = ((NDS_LCD_HEIGHT - (2 * displaySettings.centerOffsetY) - 64) + 7) & ~7;
+    const int lastColumnX = ((NDS_LCD_WIDTH - (2 * displaySettings.centerOffsetX) - 64) + 7) & ~7;
+    const int lastRowY = ((NDS_LCD_HEIGHT - (2 * displaySettings.centerOffsetY) - 64) + 7) & ~7;
 
-    // right column
     for (int y = 0; y < maxY; y += 64)
     {
         SetupCaptureSprite(displaySettings, oamPtr, lastColumnX, y);
         oamPtr += 4;
     }
 
-    // bottom row
     for (int x = 0; x < maxX; x += 64)
     {
         SetupCaptureSprite(displaySettings, oamPtr, x, lastRowY);
         oamPtr += 4;
     }
 
-    // bottom right
     SetupCaptureSprite(displaySettings, oamPtr, lastColumnX, lastRowY);
 }
 
@@ -73,7 +70,6 @@ void GbaDisplayConfigurationService::SetupCenterAndMask(const DisplaySettings& d
     u32 windowY1 = std::clamp<u32>(windowY0 + displaySettings.maskHeight, 1, NDS_LCD_HEIGHT);
     if (windowX0 == 0 && windowX1 == NDS_LCD_WIDTH)
     {
-        // use two windows to cover a width of 256
         gfx_setSubWindow0(0, windowY0, 255, windowY1);
         gfx_setSubWindow1(255, windowY0, 0, windowY1);
     }
@@ -157,4 +153,5 @@ void GbaDisplayConfigurationService::ApplyDisplaySettings(const DisplaySettings&
     SetupGbaScreen(displaySettings);
     SetupColorCorrection(displaySettings);
     SetupGbaScreenBrightness(displaySettings);
+    ariaCompanionInitialize(displaySettings);
 }
