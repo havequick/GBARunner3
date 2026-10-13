@@ -15,6 +15,8 @@
 // for this game-specific companion so its richer map still fits the image.
 #pragma GCC optimize ("Os")
 
+#define ARIA_EWRAM [[gnu::section(".ewram"), gnu::noinline]]
+
 extern GbaHeader gRomHeader;
 
 extern "C"
@@ -94,7 +96,7 @@ inline volatile u32* signatures() { return (volatile u32*)kSignatures; }
 inline volatile const u16* mapInfo() { return (volatile const u16*)kMapInfo; }
 inline volatile const u8* mapWalls() { return (volatile const u8*)kMapWalls; }
 
-void copyRomData(u32 romAddress, volatile u8* dst, u32 byteCount)
+ARIA_EWRAM void copyRomData(u32 romAddress, volatile u8* dst, u32 byteCount)
 {
     while (byteCount)
     {
@@ -109,27 +111,27 @@ void copyRomData(u32 romAddress, volatile u8* dst, u32 byteCount)
     }
 }
 
-u16 infoAt(int x, int y)
+ARIA_EWRAM u16 infoAt(int x, int y)
 {
     if ((unsigned)x >= kW || (unsigned)y >= kH) return 0xFFFF;
     return mapInfo()[y * kW + x];
 }
 
-u8 wallAt(int x, int y)
+ARIA_EWRAM u8 wallAt(int x, int y)
 {
     if ((unsigned)x >= kW || (unsigned)y >= kH) return 0;
     const u8 packed = mapWalls()[y * (kW / 2) + (x >> 1)];
     return (x & 1) ? (packed & 0xF) : (packed >> 4);
 }
 
-bool excludedFromAreaMap(int x, int y)
+ARIA_EWRAM bool excludedFromAreaMap(int x, int y)
 {
     return (x == 4 && y == 13) || (x == 12 && y == 13) ||
            (x == 13 && y == 13) || (x == 15 && y == 22) ||
            (x == 47 && y == 20);
 }
 
-CellState mapState(int screenX, int screenY)
+ARIA_EWRAM CellState mapState(int screenX, int screenY)
 {
     const int x = screenX - kMapOffsetX;
     const int y = screenY - kMapOffsetY;
@@ -158,7 +160,7 @@ CellState mapState(int screenX, int screenY)
     return areaMap && !excludedFromAreaMap(x, y) ? CELL_REVEALED : CELL_HIDDEN;
 }
 
-u8 fillColor(CellState state)
+ARIA_EWRAM u8 fillColor(CellState state)
 {
     switch (state)
     {
@@ -170,7 +172,7 @@ u8 fillColor(CellState state)
     }
 }
 
-u8 edgeColor(CellState state, int kind)
+ARIA_EWRAM u8 edgeColor(CellState state, int kind)
 {
     if (kind == 1 || kind == 2) return COLOR_SECRET_EDGE;
     return state == CELL_REVEALED ? COLOR_REVEALED_EDGE : COLOR_EDGE;
@@ -182,17 +184,17 @@ inline void px(volatile u8* t, int x, int y, u8 c)
     b = (x & 1) ? (u8)((b & 0x0F) | (c << 4)) : (u8)((b & 0xF0) | c);
 }
 
-void horizontal(volatile u8* t, int x0, int y, u8 color)
+ARIA_EWRAM void horizontal(volatile u8* t, int x0, int y, u8 color)
 {
     for (int x = x0; x < x0 + 4; ++x) px(t, x, y, color);
 }
 
-void vertical(volatile u8* t, int x, int y0, u8 color)
+ARIA_EWRAM void vertical(volatile u8* t, int x, int y0, u8 color)
 {
     for (int y = y0; y < y0 + 4; ++y) px(t, x, y, color);
 }
 
-void drawCell(volatile u8* t, int cx, int cy, int screenX, int screenY)
+ARIA_EWRAM void drawCell(volatile u8* t, int cx, int cy, int screenX, int screenY)
 {
     const CellState state = mapState(screenX, screenY);
     if (state == CELL_HIDDEN) return;
@@ -227,7 +229,7 @@ void drawCell(volatile u8* t, int cx, int cy, int screenX, int screenY)
     }
 }
 
-bool playerMapPos(int& x, int& y)
+ARIA_EWRAM bool playerMapPos(int& x, int& y)
 {
     const u32 ent = *(volatile const u32*)kPlayerPtr;
     if (ent < kEwramLo || ent + kPlayerY + 2 > kEwramHi) return false;
@@ -241,7 +243,7 @@ bool playerMapPos(int& x, int& y)
     return (unsigned)x < kW && (unsigned)y < kH;
 }
 
-u32 signature(int tx, int ty, int pxm, int pym, bool showPlayer)
+ARIA_EWRAM u32 signature(int tx, int ty, int pxm, int pym, bool showPlayer)
 {
     u32 hash = 2166136261u;
     const int x0 = tx * 2, y0 = ty * 2;
@@ -256,7 +258,7 @@ u32 signature(int tx, int ty, int pxm, int pym, bool showPlayer)
     return hash;
 }
 
-void drawTile(int tx, int ty, int pxm, int pym, bool showPlayer)
+ARIA_EWRAM void drawTile(int tx, int ty, int pxm, int pym, bool showPlayer)
 {
     volatile u8* t = tilePtr(1 + ty * kTW + tx);
     for (int i = 0; i < 32; ++i) t[i] = 0;
@@ -273,7 +275,7 @@ void drawTile(int tx, int ty, int pxm, int pym, bool showPlayer)
     }
 }
 
-void redraw()
+ARIA_EWRAM void redraw()
 {
     int x = -1, y = -1;
     const bool havePlayer = playerMapPos(x, y);
@@ -307,7 +309,7 @@ void restoreGbaWindowRegisters()
     *(volatile u16*)kRegWinOut = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_WINOUT];
 }
 
-void initSubScreen()
+ARIA_EWRAM void initSubScreen()
 {
     // H and I hold the relocated GBA BIOS and the ROM cache lookup table.
     // VRAM C is otherwise only needed by the center-and-mask capture path,
