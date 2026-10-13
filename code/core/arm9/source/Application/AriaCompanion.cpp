@@ -2,13 +2,9 @@
 #include <libtwl/mem/memVram.h>
 #include <libtwl/gfx/gfx.h>
 #include <libtwl/gfx/gfxBackground.h>
-#include <libtwl/gfx/gfxStatus.h>
-#include "Emulator/IoRegisters.h"
 #include "GbaHeader.h"
-#include "GbaIoRegOffsets.h"
 #include "SdCache/SdCache.h"
 #include "SystemIpc.h"
-#include "VirtualMachine/VMDtcm.h"
 #include "AriaCompanion.h"
 
 // VRAM-A is already tightly packed by the emulator core. Prefer compact code
@@ -18,12 +14,6 @@
 #define ARIA_EWRAM [[gnu::section(".ewram"), gnu::noinline]]
 
 extern GbaHeader gRomHeader;
-
-extern "C"
-{
-volatile u32 aria_companion_hblank_mask_active = 0;
-volatile u16 aria_companion_saved_master_bright = 0;
-}
 
 // Castlevania: Aria of Sorrow (USA) second-screen live map prototype.
 // Target ROM: A2CE / SHA-1 abd71fe01ebb201bcc133074db1dd8c5253776c7
@@ -57,12 +47,6 @@ constexpr uintptr_t kMapInfo = 0x06209400;
 constexpr uintptr_t kMapWalls = 0x0620A800;
 constexpr uintptr_t kPal = 0x05000400;
 
-constexpr u32 kWindowBits = (1 << 13) | (1 << 14) | (1 << 15);
-constexpr uintptr_t kRegWin0H = 0x04000040;
-constexpr uintptr_t kRegWin0V = 0x04000044;
-constexpr uintptr_t kRegWinIn = 0x04000048;
-constexpr uintptr_t kRegWinOut = 0x0400004A;
-
 enum CellState
 {
     CELL_HIDDEN = 0,
@@ -86,7 +70,6 @@ enum MapColor
 };
 
 bool sActive = false;
-bool sViewportWindowActive = false;
 u32 sFrame = 0;
 
 constexpr u16 rgb15(int r, int g, int b) { return (u16)(r | (g << 5) | (b << 10)); }
@@ -293,22 +276,6 @@ ARIA_EWRAM void redraw()
         }
 }
 
-void keepTopScreenMaskIrqEnabled()
-{
-    // We use HBlank only to black the DS-only scanlines 160-191. This keeps
-    // direct GBA rendering (and its latency) intact instead of frame-capturing.
-    vm_forcedIrqMask |= 1 << 1;
-    gfx_setHBlankIrqEnabled(true);
-}
-
-void restoreGbaWindowRegisters()
-{
-    *(volatile u16*)kRegWin0H = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_WIN0H];
-    *(volatile u16*)kRegWin0V = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_WIN0V];
-    *(volatile u16*)kRegWinIn = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_WININ];
-    *(volatile u16*)kRegWinOut = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_WINOUT];
-}
-
 ARIA_EWRAM void initSubScreen()
 {
     // H and I hold the relocated GBA BIOS and the ROM cache lookup table.
@@ -347,44 +314,11 @@ ARIA_EWRAM void initSubScreen()
 }
 }
 
-extern "C" u32 aria_companion_adjust_ds_dispcnt(u32 dsDispCnt, u16 gbaDispCnt)
-{
-    if (!sActive) return dsDispCnt;
-
-    if (!(gbaDispCnt & kWindowBits))
-    {
-        // Borrow WIN0 only when Aria is not using any GBA window. Inside the
-        // 240-pixel GBA viewport all layers/effects pass through; outside it,
-        // layers are hidden so the unstable extra DS columns cannot appear.
-        *(volatile u16*)kRegWin0H = 0x00F0; // x = 0..239
-        *(volatile u16*)kRegWin0V = 0x00C0; // all 192 DS scanlines
-        *(volatile u16*)kRegWinIn = (*(volatile u16*)kRegWinIn & 0xFF00) | 0x003F;
-        *(volatile u16*)kRegWinOut &= 0xFF00;
-        sViewportWindowActive = true;
-        return (dsDispCnt & ~kWindowBits) | (1 << 13);
-    }
-
-    if (sViewportWindowActive)
-    {
-        restoreGbaWindowRegisters();
-        sViewportWindowActive = false;
-    }
-    return (dsDispCnt & ~kWindowBits) | (gbaDispCnt & kWindowBits);
-}
-
 void ariaCompanionInitialize(const DisplaySettings& displaySettings)
 {
     sActive = false;
-    sViewportWindowActive = false;
-    aria_companion_hblank_mask_active = 0;
     if (gRomHeader.gameCode != kAriaUs) return;
     if (displaySettings.gbaScreen != GbaScreen::Top || displaySettings.enableCenterAndMask) return;
-
-    // Save the user's configured top-screen brightness so HBlank can restore it
-    // before scanline 0 of the next frame.
-    aria_companion_saved_master_bright = REG_MASTER_BRIGHT;
-    keepTopScreenMaskIrqEnabled();
-    aria_companion_hblank_mask_active = 1;
 
     sFrame = 0;
     initSubScreen();
@@ -396,12 +330,6 @@ void ariaCompanionInitialize(const DisplaySettings& displaySettings)
 extern "C" int aria_companion_vblank()
 {
     if (!sActive) return 0;
-
-    // Some GBA DMA transitions can alter the emulator's forced HBlank state.
-    // Reassert once per frame; the DMA stop path also preserves it for us.
-    keepTopScreenMaskIrqEnabled();
-    const u16 gbaDispCnt = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_DISPCNT];
-    REG_DISPCNT = aria_companion_adjust_ds_dispcnt(REG_DISPCNT, gbaDispCnt);
 
     ++sFrame;
     if ((sFrame & 7) == 0) redraw();
