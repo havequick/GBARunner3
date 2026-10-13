@@ -11,6 +11,10 @@
 #include "VirtualMachine/VMDtcm.h"
 #include "AriaCompanion.h"
 
+// VRAM-A is already tightly packed by the emulator core. Prefer compact code
+// for this game-specific companion so its richer map still fits the image.
+#pragma GCC optimize ("Os")
+
 extern GbaHeader gRomHeader;
 
 extern "C"
