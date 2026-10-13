@@ -50,10 +50,10 @@ static inline void updateHBlankIrqForChannelStop(void)
     if (!(dma_state.dmaFlags & DMA_FLAG_HBLANK_MASK))
     {
         emu_hblankDmaSkipInstruction = hblankDmaSkipInstruction;
-        
-            vm_forcedIrqMask &= ~(1 << 1);
-        
-            
+
+        vm_forcedIrqMask &= ~(1 << 1);
+
+
         u32 gbaDispStat = *(u16*)&emu_ioRegisters[4];
         if (!(gbaDispStat & (1 << 4)))
         {
