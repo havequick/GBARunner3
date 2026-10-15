@@ -41,8 +41,8 @@ constexpr uintptr_t kPlayerPtr = 0x02013110;
 constexpr uintptr_t kPlayerX = 0x42;
 constexpr uintptr_t kPlayerY = 0x46;
 
-// Aria's native map metadata. It is copied once from the user's ROM into spare
-// sub BG VRAM so the live renderer never performs an SD-cache load in VBlank.
+// Aria's native map metadata. It is copied once from the user's ROM into main
+// RAM so the live renderer never performs an SD-cache load in VBlank.
 constexpr u32 kMapInfoRom = 0x08116650;
 constexpr u32 kMapWallsRom = 0x08117DD0;
 
@@ -346,6 +346,15 @@ inline void startMapDma()
         DMACNT_DST_MODE_FIXED |
         DMACNT_COUNT(4));
 }
+}
+
+extern "C" ARIA_EWRAM void aria_companion_set_dispcnt(u32 dsDispCnt)
+{
+    if (gAriaCompanionDisplayModeOverride)
+    {
+        dsDispCnt = (dsDispCnt & ~(3u << 16)) | gAriaCompanionDisplayModeOverride;
+    }
+    REG_DISPCNT = dsDispCnt;
 }
 
 void ariaCompanionInitialize(const DisplaySettings& displaySettings)
