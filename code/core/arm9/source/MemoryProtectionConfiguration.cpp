@@ -10,9 +10,13 @@ extern "C" void setupMemoryProtection()
         .WithInstructionAccessPermission(MPU_ACCESS_PERMISSION_PRIV_READ_WRITE)
         .ApplyToRegion(MPU_REGION_0);
 
-    // mpu region 1: Cached Main Memory
+    // mpu region 1: Cached Main Memory. The linker places cold ARM9 code in
+    // .ewram at 0x02040000, so privileged instruction access must match the
+    // executable EWRAM program header as well as the data-cache policy.
     MemoryProtectionRegionBuilder(0x02000000, MPU_REGION_SIZE_4MB)
         .WithDataAccessPermission(MPU_ACCESS_PERMISSION_PRIV_READ_WRITE)
+        .WithInstructionAccessPermission(MPU_ACCESS_PERMISSION_PRIV_READ_WRITE)
+        .WithInstructionCache()
         .WithDataCache()
         .ApplyToRegion(MPU_REGION_1);
 
