@@ -1,6 +1,8 @@
 #pragma once
 
-#define SDC_SIZE                (1 * 1024 * 1024)
+// Reserve 32 KiB for the Aria companion's full 256x192 FIFO framebuffer.
+// This trims the ROM cache by 3.125% while keeping its 4 KiB block geometry.
+#define SDC_SIZE                (992 * 1024)
 #define SDC_BLOCK_SHIFT         12
 #define SDC_BLOCK_SIZE          (1 << SDC_BLOCK_SHIFT)
 #define SDC_BLOCK_MASK          (SDC_BLOCK_SIZE - 1)
