@@ -5,14 +5,12 @@
 
 arm_func emu_vblankIrq
 #ifndef GBAR3_TEST
-    // The Aria companion owns VRAM C, so its active return value bypasses
-    // GBARunner3's otherwise-unconditional C/D display-capture swap.
+    // Refresh the Aria bottom-screen FIFO framebuffer, then continue through
+    // GBARunner3's original C/D capture swap for the centered top screen.
     ldr sp,= dtcmIrqStackEnd
     push {r0-r3,r12}
     bl aria_companion_vblank
-    cmp r0, #0
     pop {r0-r3,r12}
-    bne skipDisplayCapture
 #endif
 
     // For center and mask display capture has to be enabled every frame
@@ -41,7 +39,6 @@ updateDisplayCaptureVramD:
 checkSaveWrite:
     str r13, jumpToCaptureUpdate
 
-skipDisplayCapture:
     // This is replaced by a nop when no vblank dma is in use
 .global emu_vblankDmaJumpInstruction
 emu_vblankDmaJumpInstruction:
