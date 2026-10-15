@@ -83,7 +83,8 @@ static void displayModeChange(u32 oldMode, u32 newMode)
     }
 }
 
-[[gnu::section(".itcm")]]
+// The ITCM layout reserves an exact fixed slot for this handler.
+[[gnu::section(".itcm"), gnu::optimize("Os")]]
 void emu_regDispCntStore(u16 newValue)
 {
     u32 oldValue = *(u16*)&emu_ioRegisters[GBA_REG_OFFS_DISPCNT];
