@@ -6,7 +6,7 @@
 #include "MemoryEmulator/MemoryLoadStore.h"
 #include "GbaIoRegOffsets.h"
 
-extern u32 gAriaCompanionDisplayModeOverride;
+extern void aria_companion_set_dispcnt(u32 dsDispCnt);
 
 static void setVramLoad012(void)
 {
@@ -142,9 +142,7 @@ void emu_regDispCntStore(u16 newValue)
         displayModeChange(oldMode, newMode);
     }
 
-    if (gAriaCompanionDisplayModeOverride)
-    {
-        dsDispCnt = (dsDispCnt & ~(3u << 16)) | gAriaCompanionDisplayModeOverride;
-    }
-    REG_DISPCNT = dsDispCnt;
+    // Keep this fixed-size ITCM handler lean. The companion helper applies its
+    // optional display-mode override and performs the hardware register write.
+    aria_companion_set_dispcnt(dsDispCnt);
 }
