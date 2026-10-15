@@ -6,6 +6,8 @@
 #include "MemoryEmulator/MemoryLoadStore.h"
 #include "GbaIoRegOffsets.h"
 
+extern u32 gAriaCompanionDisplayModeOverride;
+
 static void setVramLoad012(void)
 {
     memu_setLoad8Handler(6, memu_load8Vram012);
@@ -140,5 +142,9 @@ void emu_regDispCntStore(u16 newValue)
         displayModeChange(oldMode, newMode);
     }
 
+    if (gAriaCompanionDisplayModeOverride)
+    {
+        dsDispCnt = (dsDispCnt & ~(3u << 16)) | gAriaCompanionDisplayModeOverride;
+    }
     REG_DISPCNT = dsDispCnt;
 }
